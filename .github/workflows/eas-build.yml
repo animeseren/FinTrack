@@ -16,19 +16,15 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 18.x
-
-      - name: Get npm cache directory
-        id: npm-cache-dir
+          
+      - name: Force NPM Package Manager
         run: |
-          echo "dir=$(npm config get cache)" >> $GITHUB_OUTPUT
-
-      - uses: actions/cache@v3
-        id: npm-cache
-        with:
-          path: ${{ steps.npm-cache-dir.outputs.dir }}
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
+          echo "Ensuring yarn is not used..."
+          if [ -f yarn.lock ]; then
+            rm yarn.lock
+          fi
+          npm config set registry https://registry.npmjs.org/
+          npm config set legacy-peer-deps true
 
       - name: Clean install directory
         run: |
@@ -47,11 +43,13 @@ jobs:
       - name: Install dependencies
         run: |
           echo "Installing dependencies..."
-          npm install
+          npm install --legacy-peer-deps
           echo "Installing global tools..."
-          npm install -g eas-cli@latest expo-cli@latest
+          sudo npm install -g eas-cli@latest expo-cli@latest --force
           echo "Installing expo-dev-client..."
           npx expo install expo-dev-client
+          echo "Verifying package installation..."
+          npm ls --depth=0
         continue-on-error: false
 
       - name: Display Diagnostic Information
@@ -117,10 +115,21 @@ jobs:
           }
           EOF
 
+      - name: Pre-build checks
+        run: |
+          echo "Checking Expo configuration..."
+          npx expo config --type prebuild
+
       - name: Build Android app
         run: |
           echo "Starting EAS build..."
-          eas build --platform android --profile preview --non-interactive
+          eas build \
+            --platform android \
+            --profile preview \
+            --non-interactive \
+            --no-wait \
+            --clear-cache
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           NODE_OPTIONS: --max-old-space-size=4096
+          npm_config_legacy_peer_deps: true
