@@ -31,9 +31,9 @@ jobs:
       - name: Setup Expo and EAS
         run: |
           echo "Installing Expo and EAS CLI..."
-          npm install -g expo-cli@latest eas-cli@latest
+          npm install -g @expo/cli@latest eas-cli@latest
           echo "Verifying installations..."
-          expo --version
+          npx expo --version
           eas --version
 
       - name: Install dependencies
@@ -77,11 +77,12 @@ jobs:
           fi
           
           echo "Logging in to Expo..."
-          eas auth:logout || true
-          if ! eas auth:login --non-interactive; then
-            echo "Failed to login with token, trying alternative method..."
-            eas auth:login --token "$EXPO_TOKEN"
-          fi
+          # Logout first (ignore errors if not logged in)
+          eas logout || true
+          
+          # Try to login with token
+          echo "Attempting login..."
+          echo $EXPO_TOKEN | eas login
           
           echo "Verifying login status..."
           eas whoami || {
