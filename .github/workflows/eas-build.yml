@@ -16,14 +16,24 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 18.x
-          cache: 'npm'
-          cache-dependency-path: '**/package-lock.json'
 
-      - name: Clean npm cache
+      - name: Get npm cache directory
+        id: npm-cache-dir
         run: |
-          npm cache clean --force
+          echo "dir=$(npm config get cache)" >> $GITHUB_OUTPUT
+
+      - uses: actions/cache@v3
+        id: npm-cache
+        with:
+          path: ${{ steps.npm-cache-dir.outputs.dir }}
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Clean install directory
+        run: |
           rm -rf node_modules
-          rm -rf ~/.npm
+          rm -f package-lock.json
 
       - name: Setup Expo and EAS
         uses: expo/expo-github-action@v8
@@ -36,20 +46,41 @@ jobs:
 
       - name: Install dependencies
         run: |
-          npm cache verify
-          npm install --no-cache
-          npm install -g expo-cli@latest
-          npm install -g eas-cli@latest
+          echo "Installing dependencies..."
+          npm install
+          echo "Installing global tools..."
+          npm install -g eas-cli@latest expo-cli@latest
+          echo "Installing expo-dev-client..."
           npx expo install expo-dev-client
+        continue-on-error: false
+
+      - name: Display Diagnostic Information
+        run: |
+          echo "Node version:"
+          node --version
+          echo "NPM version:"
+          npm --version
+          echo "Expo CLI version:"
+          expo --version
+          echo "EAS CLI version:"
+          eas --version
+          echo "Package.json contents:"
+          cat package.json
+          echo "Node modules list:"
+          ls -la node_modules
 
       - name: Verify Expo Login
         run: |
-          echo "Verifying Expo CLI installation..."
-          npx expo --version
-          echo "Checking Expo authentication status..."
-          eas whoami || (echo "Logging in to Expo..." && eas login -u animeseren)
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          echo "Authenticating with Expo..."
+          if ! eas whoami; then
+            echo "Logging in to Expo..."
+            if [ -n "${{ secrets.EXPO_TOKEN }}" ]; then
+              echo "${{ secrets.EXPO_TOKEN }}" | eas login --non-interactive
+            else
+              echo "Error: EXPO_TOKEN secret is not set in the repository"
+              exit 1
+            fi
+          fi
 
       - name: Update EAS Config
         run: |
@@ -57,9 +88,18 @@ jobs:
           cat > eas.json << EOF
           {
             "cli": {
-              "version": ">= 3.13.3"
+              "version": ">= 3.13.3",
+              "requireCommit": false
             },
             "build": {
+              "development-simulator": {
+                "developmentClient": true,
+                "distribution": "internal",
+                "android": {
+                  "gradleCommand": ":app:assembleDebug",
+                  "buildType": "apk"
+                }
+              },
               "development": {
                 "developmentClient": true,
                 "distribution": "internal",
@@ -72,11 +112,6 @@ jobs:
                 "android": {
                   "buildType": "apk"
                 }
-              },
-              "production": {
-                "android": {
-                  "buildType": "app-bundle"
-                }
               }
             }
           }
@@ -85,6 +120,7 @@ jobs:
       - name: Build Android app
         run: |
           echo "Starting EAS build..."
-          eas build --platform android --profile preview --non-interactive --no-wait
+          eas build --platform android --profile preview --non-interactive
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          NODE_OPTIONS: --max-old-space-size=4096
