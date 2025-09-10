@@ -16,17 +16,30 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 18.x
-          cache: npm
+          cache: 'npm'
+          cache-dependency-path: '**/package-lock.json'
+
+      - name: Clean npm cache
+        run: |
+          npm cache clean --force
+          rm -rf node_modules
+          rm -rf ~/.npm
 
       - name: Setup Expo and EAS
         uses: expo/expo-github-action@v8
         with:
           eas-version: latest
+          expo-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
+        env:
+          ACTIONS_STEP_DEBUG: true
 
       - name: Install dependencies
         run: |
-          npm install
+          npm cache verify
+          npm install --no-cache
+          npm install -g expo-cli@latest
+          npm install -g eas-cli@latest
           npx expo install expo-dev-client
 
       - name: Verify Expo Login
@@ -34,7 +47,9 @@ jobs:
           echo "Verifying Expo CLI installation..."
           npx expo --version
           echo "Checking Expo authentication status..."
-          npx eas whoami
+          eas whoami || (echo "Logging in to Expo..." && eas login -u animeseren)
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
       - name: Update EAS Config
         run: |
