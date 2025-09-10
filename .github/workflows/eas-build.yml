@@ -67,17 +67,27 @@ jobs:
           ls -la node_modules
 
       - name: Verify Expo Login
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           echo "Authenticating with Expo..."
-          if ! eas whoami; then
-            echo "Logging in to Expo..."
-            if [ -n "${{ secrets.EXPO_TOKEN }}" ]; then
-              echo "${{ secrets.EXPO_TOKEN }}" | eas login --non-interactive
-            else
-              echo "Error: EXPO_TOKEN secret is not set in the repository"
-              exit 1
-            fi
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "Error: EXPO_TOKEN secret is not set in the repository"
+            exit 1
           fi
+          
+          echo "Logging in to Expo..."
+          eas auth:logout || true
+          if ! eas auth:login --non-interactive; then
+            echo "Failed to login with token, trying alternative method..."
+            eas auth:login --token "$EXPO_TOKEN"
+          fi
+          
+          echo "Verifying login status..."
+          eas whoami || {
+            echo "Failed to authenticate with Expo"
+            exit 1
+          }
 
       - name: Update EAS Config
         run: |
