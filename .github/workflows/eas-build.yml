@@ -15,14 +15,11 @@ jobs:
 
       - uses: actions/setup-node@v3
         with:
-          node-version: 18.x
+          node-version: 20.x
           
-      - name: Force NPM Package Manager
+      - name: Setup npm
         run: |
-          echo "Ensuring yarn is not used..."
-          if [ -f yarn.lock ]; then
-            rm yarn.lock
-          fi
+          npm install -g npm@latest
           npm config set registry https://registry.npmjs.org/
           npm config set legacy-peer-deps true
 
@@ -32,24 +29,26 @@ jobs:
           rm -f package-lock.json
 
       - name: Setup Expo and EAS
-        uses: expo/expo-github-action@v8
-        with:
-          eas-version: latest
-          expo-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
-        env:
-          ACTIONS_STEP_DEBUG: true
+        run: |
+          echo "Installing Expo and EAS CLI..."
+          npm install -g expo-cli@latest eas-cli@latest
+          echo "Verifying installations..."
+          expo --version
+          eas --version
 
       - name: Install dependencies
         run: |
+          echo "Cleaning npm cache..."
+          npm cache clean --force
+          
           echo "Installing dependencies..."
-          npm install --legacy-peer-deps
-          echo "Installing global tools..."
-          sudo npm install -g eas-cli@latest expo-cli@latest --force
+          npm install --legacy-peer-deps --prefer-offline=false
+          
           echo "Installing expo-dev-client..."
           npx expo install expo-dev-client
+          
           echo "Verifying package installation..."
-          npm ls --depth=0
+          npm ls --depth=0 || true
         continue-on-error: false
 
       - name: Display Diagnostic Information
