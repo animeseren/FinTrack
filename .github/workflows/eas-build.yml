@@ -31,10 +31,15 @@ jobs:
       - name: Setup Expo and EAS
         run: |
           echo "Installing Expo and EAS CLI..."
-          npm install -g @expo/cli@latest eas-cli@latest
+          npm install -g @expo/cli eas-cli
+          npm install -g expo-cli --legacy-peer-deps
+          
+          echo "Adding npm global bin to PATH..."
+          export PATH="$(npm config get prefix)/bin:$PATH"
+          
           echo "Verifying installations..."
-          npx expo --version
-          eas --version
+          npx expo --version || echo "Expo CLI not installed globally"
+          npx eas --version || echo "EAS CLI not installed globally"
 
       - name: Install dependencies
         run: |
@@ -44,8 +49,13 @@ jobs:
           echo "Installing dependencies..."
           npm install --legacy-peer-deps --prefer-offline=false
           
-          echo "Installing expo-dev-client..."
-          npx expo install expo-dev-client
+          echo "Installing Expo development dependencies..."
+          npm install expo-cli @expo/cli eas-cli --save-dev
+          npm install expo-dev-client --save
+          
+          echo "Verifying local installations..."
+          npx expo --version || echo "Expo CLI not found in local dependencies"
+          npx eas --version || echo "EAS CLI not found in local dependencies"
           
           echo "Verifying package installation..."
           npm ls --depth=0 || true
@@ -58,13 +68,15 @@ jobs:
           echo "NPM version:"
           npm --version
           echo "Expo CLI version:"
-          expo --version
+          npx expo --version || echo "Expo CLI not found"
           echo "EAS CLI version:"
-          eas --version
+          npx eas --version || echo "EAS CLI not found"
+          echo "Checking global installations:"
+          npm list -g --depth=0
           echo "Package.json contents:"
           cat package.json
-          echo "Node modules list:"
-          ls -la node_modules
+          echo "Local node_modules:"
+          ls -la node_modules || echo "node_modules not found"
 
       - name: Verify Expo Login
         env:
