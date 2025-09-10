@@ -25,7 +25,51 @@ jobs:
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Install dependencies
-        run: npm install
+        run: |
+          npm install
+          npx expo install expo-dev-client
+
+      - name: Verify Expo Login
+        run: |
+          echo "Verifying Expo CLI installation..."
+          npx expo --version
+          echo "Checking Expo authentication status..."
+          npx eas whoami
+
+      - name: Update EAS Config
+        run: |
+          echo "Updating eas.json configuration..."
+          cat > eas.json << EOF
+          {
+            "cli": {
+              "version": ">= 3.13.3"
+            },
+            "build": {
+              "development": {
+                "developmentClient": true,
+                "distribution": "internal",
+                "android": {
+                  "buildType": "apk"
+                }
+              },
+              "preview": {
+                "distribution": "internal",
+                "android": {
+                  "buildType": "apk"
+                }
+              },
+              "production": {
+                "android": {
+                  "buildType": "app-bundle"
+                }
+              }
+            }
+          }
+          EOF
 
       - name: Build Android app
-        run: eas build --platform android --non-interactive --no-wait
+        run: |
+          echo "Starting EAS build..."
+          eas build --platform android --profile preview --non-interactive --no-wait
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
